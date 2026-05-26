@@ -4,8 +4,7 @@ import { View, Text, Pressable, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { WebView } from 'react-native-webview';
-import type { WebViewMessageEvent } from 'react-native-webview';
+import { MapHtmlView } from '@/components/MapHtmlView';
 import { AppHeader } from '@/components/AppHeader';
 import { TabBar } from '@/components/TabBar';
 import { useDiagnosisStore, CANDIDATE_HOODS } from '@/store/useDiagnosisStore';
@@ -62,7 +61,31 @@ function buildMapHTML(hoods: Hood[], buildings: Building[]): string {
   return `<!DOCTYPE html>
 <html>
 <head>
+<base href="https://localhost/">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<script>
+(function(){
+  var d=Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype,'src');
+  var origCreate=document.createElement.bind(document);
+  document.createElement=function(tag){
+    var el=origCreate(tag);
+    if(String(tag).toLowerCase()==='script'){
+      Object.defineProperty(el,'src',{
+        configurable:true,
+        get:function(){return d.get.call(this);},
+        set:function(v){
+          if(typeof v==='string'){
+            if(v.indexOf('http://')===0) v='https://'+v.slice(7);
+            else if(v.indexOf('//')===0) v='https:'+v;
+          }
+          d.set.call(this,v);
+        }
+      });
+    }
+    return el;
+  };
+})();
+</script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body,#map{width:100%;height:100%}
@@ -79,7 +102,7 @@ html,body,#map{width:100%;height:100%}
 #hints{position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:10}
 .hint{pointer-events:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;position:absolute;width:40px;height:40px;cursor:pointer}
 </style>
-<script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_JS_KEY}&autoload=false"></script>
+<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_JS_KEY}&autoload=false"></script>
 </head>
 <body>
 <div id="map"></div>
@@ -88,7 +111,9 @@ html,body,#map{width:100%;height:100%}
 var GEO=${geo};
 var BLDGS=${bldgs};
 function tap(n){
-  window.ReactNativeWebView&&window.ReactNativeWebView.postMessage(JSON.stringify({type:'tap',name:n}));
+  var p=JSON.stringify({type:'tap',name:n});
+  if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(p);}
+  else if(window.parent){window.parent.postMessage(p,'*');}
 }
 kakao.maps.load(function(){
     function scoreCol(s){return s>=90?'#064E3B':s>=80?'#059669':s>=70?'#10B981':'#6EE7B7'}
@@ -191,9 +216,9 @@ function KakaoMapView({ hoods, buildings, selected, onSelect }: {
 }) {
   const mapHtml = useMemo(() => buildMapHTML(hoods, buildings), [hoods, buildings]);
 
-  const handleMessage = (e: WebViewMessageEvent) => {
+  const handleMessage = (data: string) => {
     try {
-      const msg = JSON.parse(e.nativeEvent.data) as { type: string; name?: string };
+      const msg = JSON.parse(data) as { type: string; name?: string };
       if (msg.type === 'tap' && msg.name) {
         const h = hoods.find((hood) => hood.name === msg.name);
         if (h) onSelect(h);
@@ -205,17 +230,7 @@ function KakaoMapView({ hoods, buildings, selected, onSelect }: {
     <>
       <View style={{ flex: 1, margin: 14, marginTop: 0, borderRadius: 12, overflow: 'hidden',
         borderWidth: 1, borderColor: '#F4F4F5' }}>
-        <WebView
-          source={{ html: mapHtml, baseUrl: 'https://localhost' }}
-          style={{ flex: 1 }}
-          originWhitelist={['*']}
-          javaScriptEnabled
-          domStorageEnabled
-          mixedContentMode="compatibility"
-          onMessage={handleMessage}
-          scrollEnabled={false}
-          webviewDebuggingEnabled={true}
-        />
+        <MapHtmlView html={mapHtml} onMessage={handleMessage} />
       </View>
       {/* 선택 동네 미리보기 */}
       <View className="flex-row items-center gap-2.5 mx-[14px] mb-[14px] bg-white rounded-2xl p-3"
