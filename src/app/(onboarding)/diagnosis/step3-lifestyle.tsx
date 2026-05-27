@@ -1,10 +1,11 @@
 // Route: /(onboarding)/diagnosis/step3-lifestyle (Step3: 예산)
 import { DiagnosisShell } from '@/components/DiagnosisShell';
+import { usePoliciesPreview } from '@/hooks/usePoliciesPreview';
 import { useDiagnosisStore } from '@/store/useDiagnosisStore';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useRef } from 'react';
-import { PanResponder, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, PanResponder, Pressable, Text, View } from 'react-native';
 
 const DEPOSIT_MAX = 10000;
 const DEPOSIT_STEP = 500;
@@ -88,28 +89,80 @@ function DragSlider({ value, min, max, step, onChange, label, rangeMaxLabel, dis
   );
 }
 
-function HintCard({ text, active }: { text: string; active: boolean }) {
+function HintCard({
+  text,
+  sub,
+  active,
+  loading,
+}: {
+  text: string;
+  sub?: string | null;
+  active: boolean;
+  loading?: boolean;
+}) {
   return (
     <View style={{
-      flexDirection: 'row', alignItems: 'center', gap: 8,
+      flexDirection: 'row', alignItems: sub ? 'flex-start' : 'center', gap: 8,
       paddingHorizontal: 12, paddingVertical: 12, borderRadius: 12, borderWidth: 1,
       backgroundColor: active ? '#ECFDF5' : '#FAFAFA',
       borderColor: active ? '#D1FAE5' : '#E4E4E7',
+      opacity: loading ? 0.65 : 1,
     }}>
-      <Ionicons name={active ? 'checkmark' : 'close'} size={14} color={active ? '#059669' : '#A1A1AA'} />
-      <Text style={{ fontSize: 12, fontWeight: '600', flex: 1, color: active ? '#059669' : '#A1A1AA' }}>
-        {text}
-      </Text>
+      {loading ? (
+        <ActivityIndicator
+          size="small"
+          color={active ? '#059669' : '#A1A1AA'}
+          style={{ width: 14, height: 14, marginTop: sub ? 2 : 0 }}
+        />
+      ) : (
+        <Ionicons
+          name={active ? 'checkmark' : 'close'}
+          size={14}
+          color={active ? '#059669' : '#A1A1AA'}
+          style={{ marginTop: sub ? 2 : 0 }}
+        />
+      )}
+      <View style={{ flex: 1, gap: 3 }}>
+        <Text style={{ fontSize: 12, fontWeight: '600', color: active ? '#059669' : '#A1A1AA' }}>
+          {text}
+        </Text>
+        {sub ? (
+          <Text style={{ fontSize: 11, color: active ? '#047857' : '#71717A' }} numberOfLines={1}>
+            {sub}
+          </Text>
+        ) : null}
+      </View>
     </View>
   );
 }
 
+function formatLoan(v: number): string {
+  return v >= 10000
+    ? `${(v / 10000).toFixed(v % 10000 === 0 ? 0 : 1)}억`
+    : `${v.toLocaleString()}만`;
+}
+
+function namesSub(items: { name: string }[]): string | null {
+  if (items.length === 0) return null;
+  if (items.length === 1) return items[0].name;
+  if (items.length === 2) return `${items[0].name}, ${items[1].name}`;
+  return `${items[0].name}, ${items[1].name} 외 ${items.length - 2}건`;
+}
+
 export default function Step3LifestyleScreen() {
   const { depositWan, monthlyRentWan, setDepositWan, setMonthlyRentWan } = useDiagnosisStore();
+  const { data: policies, isLoading: policiesLoading } = usePoliciesPreview(depositWan, monthlyRentWan);
 
   const depositDisplay =
     depositWan >= 10000 ? `${depositWan / 10000}억` : `${depositWan.toLocaleString()}만`;
   const rentDisplay = `${monthlyRentWan}만`;
+
+  const monthlyItems = policies?.by_card.monthly ?? [];
+  const jeonseItems = policies?.by_card.jeonse ?? [];
+  const monthlyCount = monthlyItems.length;
+  const jeonseCount = jeonseItems.length;
+  const maxMonthly = policies?.summary.max_monthly_support_wan ?? null;
+  const maxLoan = policies?.summary.max_loan_limit_wan ?? null;
 
   return (
     <DiagnosisShell
@@ -156,20 +209,24 @@ export default function Step3LifestyleScreen() {
           rangeMaxLabel="100만"
         />
         <HintCard
+          active={monthlyCount > 0}
+          loading={policiesLoading}
           text={
-            monthlyRentWan <= 60
-              ? '청년월세 한도 충족 · 월 20만 지원 가능'
-              : '청년월세 한도 초과 (월세 60만 이하 시 적용)'
+            monthlyCount > 0
+              ? `월세 지원 ${monthlyCount}건 매칭${maxMonthly !== null ? ` · 최대 월 ${maxMonthly}만` : ''}`
+              : '월세 지원 매칭 없음'
           }
-          active={monthlyRentWan <= 60}
+          sub={namesSub(monthlyItems)}
         />
         <HintCard
+          active={jeonseCount > 0}
+          loading={policiesLoading}
           text={
-            depositWan <= 7000
-              ? '버팀목 대출 한도 7,000만 적용'
-              : '버팀목 대출 한도 초과 (보증금 7,000만 이하 시 적용)'
+            jeonseCount > 0
+              ? `전세 대출 ${jeonseCount}건 매칭${maxLoan !== null ? ` · 최대 한도 ${formatLoan(maxLoan)}` : ''}`
+              : '전세 대출 매칭 없음'
           }
-          active={depositWan <= 7000}
+          sub={namesSub(jeonseItems)}
         />
       </View>
 
