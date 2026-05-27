@@ -1,14 +1,21 @@
 // Route: /(onboarding)/diagnosis/step1-goal (Step1: 직장·근무지)
 import { DiagnosisShell } from '@/components/DiagnosisShell';
-import { JOB_TYPES, useDiagnosisStore } from '@/store/useDiagnosisStore';
+import { PostcodeView } from '@/components/PostcodeView';
+import { useJobCategories } from '@/hooks/useJobCategories';
+import { useDiagnosisStore } from '@/store/useDiagnosisStore';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Modal, Pressable, Text, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function Step1GoalScreen() {
-  const { companyName, workAddress, jobType, setCompanyName, setWorkAddress, setJobType } =
+  const { companyName, workAddress, jobCategoryId, setCompanyName, setWorkAddress, setJobCategory } =
     useDiagnosisStore();
-  const canNext = companyName.trim().length > 0 && workAddress.trim().length > 0;
+  const [postcodeOpen, setPostcodeOpen] = useState(false);
+  const { data: jobCategories, isLoading: jobsLoading, error: jobsError } = useJobCategories();
+  const canNext =
+    companyName.trim().length > 0 && workAddress.trim().length > 0 && jobCategoryId.length > 0;
 
   return (
     <DiagnosisShell
@@ -53,39 +60,78 @@ export default function Step1GoalScreen() {
 
         <View className="gap-1.5">
           <Text className="text-[12px] font-semibold text-[#3F3F46] tracking-[0.02em]">근무지 주소</Text>
-          <View className="flex-row items-center gap-2 px-3 py-3 bg-white border border-[#E4E4E7] rounded-xl">
+          <Pressable
+            onPress={() => setPostcodeOpen(true)}
+            className="flex-row items-center gap-2 px-3 py-3 bg-white border border-[#E4E4E7] rounded-xl active:opacity-70"
+          >
             <Ionicons name="location-outline" size={16} color="#A1A1AA" />
-            <TextInput
-              style={{ flex: 1, fontSize: 14, color: '#18181B' }}
-              placeholder="예: 강남구 테헤란로 152"
-              placeholderTextColor="#A1A1AA"
-              value={workAddress}
-              onChangeText={setWorkAddress}
-              returnKeyType="done"
-            />
-          </View>
+            <Text
+              style={{ flex: 1, fontSize: 14, color: workAddress ? '#18181B' : '#A1A1AA' }}
+              numberOfLines={1}
+            >
+              {workAddress || '주소 검색'}
+            </Text>
+            <Ionicons name="search-outline" size={16} color="#A1A1AA" />
+          </Pressable>
         </View>
 
         <View className="gap-1.5">
           <Text className="text-[12px] font-semibold text-[#3F3F46] tracking-[0.02em]">직종</Text>
-          <View className="flex-row flex-wrap gap-2">
-            {JOB_TYPES.map((job) => (
-              <Pressable
-                key={job}
-                onPress={() => setJobType(job)}
-                className={`px-3 py-[7px] rounded-full border ${
-                  jobType === job ? 'bg-[#0A0A0B] border-[#0A0A0B]' : 'bg-white border-[#E4E4E7]'
-                }`}
-              >
-                <Text className={`text-[12px] font-semibold ${jobType === job ? 'text-white' : 'text-[#3F3F46]'}`}>
-                  {job}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+          {jobsLoading ? (
+            <View className="py-3"><ActivityIndicator size="small" color="#A1A1AA" /></View>
+          ) : jobsError ? (
+            <Text className="text-[12px] text-[#DC2626] py-2">직종 목록 로드 실패</Text>
+          ) : (
+            <View className="flex-row flex-wrap gap-2">
+              {(jobCategories ?? []).map((cat) => {
+                const selected = jobCategoryId === cat.id;
+                return (
+                  <Pressable
+                    key={cat.id}
+                    onPress={() => {
+                      console.log('[step1] jobCategory selected', cat);
+                      setJobCategory(cat.id, cat.name);
+                    }}
+                    className={`px-3 py-[7px] rounded-full border ${
+                      selected ? 'bg-[#0A0A0B] border-[#0A0A0B]' : 'bg-white border-[#E4E4E7]'
+                    }`}
+                  >
+                    <Text className={`text-[12px] font-semibold ${selected ? 'text-white' : 'text-[#3F3F46]'}`}>
+                      {cat.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
         </View>
       </View>
 
+      <Modal
+        visible={postcodeOpen}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setPostcodeOpen(false)}
+      >
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }} edges={['top']}>
+          <View className="h-12 px-3 flex-row items-center justify-between border-b border-[#F4F4F5]">
+            <Pressable onPress={() => setPostcodeOpen(false)} hitSlop={12} className="p-1">
+              <Ionicons name="close" size={22} color="#0A0A0B" />
+            </Pressable>
+            <Text className="text-[14px] font-bold text-[#0A0A0B]">근무지 주소 검색</Text>
+            <View style={{ width: 24 }} />
+          </View>
+          <PostcodeView
+            onSelect={(result) => {
+              console.log('[step1] postcode onSelect', result);
+              const addr = result.roadAddress || result.jibunAddress;
+              console.log('[step1] setting workAddress', addr);
+              setWorkAddress(addr);
+              setPostcodeOpen(false);
+            }}
+          />
+        </SafeAreaView>
+      </Modal>
     </DiagnosisShell>
   );
 }

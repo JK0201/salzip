@@ -1,11 +1,9 @@
 import { create } from 'zustand';
 
-export const JOB_TYPES = ['IT·개발', '디자인', '경영·사무', '영업', '교육', '의료'] as const;
 export const COMMUTE_OPTIONS = ['30분 이내', '45분 이내', '1시간 이내'] as const;
 export const LIFESTYLE_CHIPS = ['활기형', '조용형', '야근형', '주말활동', '카페·식당', '대중교통', '반려동물'] as const;
 export const HOUSEHOLD_TYPES = ['1인 가구', '청년 부부', '예비 신혼', '한부모'] as const;
 
-type JobType = (typeof JOB_TYPES)[number];
 type CommuteOption = (typeof COMMUTE_OPTIONS)[number];
 type HouseholdType = (typeof HOUSEHOLD_TYPES)[number];
 
@@ -63,7 +61,8 @@ interface DiagnosisState {
   // step1
   companyName: string;
   workAddress: string;
-  jobType: JobType;
+  jobCategoryId: string;
+  jobCategoryName: string;
   // step2
   commuteLimit: CommuteOption;
   lifestyle: string[];
@@ -80,7 +79,7 @@ interface DiagnosisState {
 
   setCompanyName: (v: string) => void;
   setWorkAddress: (v: string) => void;
-  setJobType: (v: JobType) => void;
+  setJobCategory: (id: string, name: string) => void;
   setCommuteLimit: (v: CommuteOption) => void;
   toggleLifestyle: (chip: string) => void;
   setDepositWan: (v: number) => void;
@@ -95,7 +94,8 @@ interface DiagnosisState {
 export const useDiagnosisStore = create<DiagnosisState>((set) => ({
   companyName: '',
   workAddress: '',
-  jobType: 'IT·개발',
+  jobCategoryId: '',
+  jobCategoryName: '',
   commuteLimit: '45분 이내',
   lifestyle: [],
   depositWan: 3000,
@@ -108,7 +108,7 @@ export const useDiagnosisStore = create<DiagnosisState>((set) => ({
 
   setCompanyName: (v) => set({ companyName: v }),
   setWorkAddress: (v) => set({ workAddress: v }),
-  setJobType: (v) => set({ jobType: v }),
+  setJobCategory: (id, name) => set({ jobCategoryId: id, jobCategoryName: name }),
   setCommuteLimit: (v) => set({ commuteLimit: v }),
   toggleLifestyle: (chip) =>
     set((s) => ({
