@@ -1,5 +1,5 @@
 import client from './client';
-import type { Hood } from '@/store/useDiagnosisStore';
+import type { RecommendResult } from '@/types/recommend';
 
 export type RecommendRequest = {
   workplace_name: string;
@@ -15,13 +15,9 @@ export type RecommendRequest = {
   home_ownerless: boolean;
 };
 
-export type RecommendResponse = {
-  hoods: Hood[];
-};
-
-export async function postRecommend(body: RecommendRequest): Promise<RecommendResponse> {
+export async function postRecommend(body: RecommendRequest): Promise<RecommendResult> {
   console.log('[api] postRecommend body', body);
-  const { data } = await client.post<RecommendResponse>('/api/v1/recommend', body);
-  console.log('[api] postRecommend response', data);
+  const { data } = await client.post<RecommendResult>('/api/v1/recommend', body);
+  console.log('[api] postRecommend response areas:', data.areas?.length, 'match_id:', data.match_id);
   return data;
 }

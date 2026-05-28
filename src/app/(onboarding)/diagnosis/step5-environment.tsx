@@ -63,7 +63,7 @@ export default function Step5EnvironmentScreen() {
 
     postRecommend(body)
       .then((res) => {
-        if (res.hoods?.length) setResults(res.hoods);
+        if (res.areas?.length) setResults(res.areas, res.match_id);
       })
       .catch((e) => {
         console.log('[step5] recommend error', e);
